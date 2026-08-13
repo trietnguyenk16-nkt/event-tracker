@@ -1,0 +1,5 @@
+/** Gửi email qua Resend; secret chỉ dùng phía server. */
+import {Resend} from 'resend';
+const resend=process.env.RESEND_API_KEY?new Resend(process.env.RESEND_API_KEY):null;
+const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]??c));
+export async function sendEventReminder(x:{to:string;title:string;description?:string|null;eventDate:Date}){if(!resend)throw Error('Thiếu RESEND_API_KEY');return resend.emails.send({from:process.env.EMAIL_FROM??'Event Tracker <onboarding@resend.dev>',to:x.to,subject:'Nhắc lịch: '+x.title,html:'<div style="font-family:Arial;max-width:560px"><h1>'+esc(x.title)+'</h1><p>Sự kiện diễn ra lúc <strong>'+x.eventDate.toLocaleString('vi-VN')+'</strong>.</p>'+(x.description?'<p>'+esc(x.description)+'</p>':'')+'</div>'});}

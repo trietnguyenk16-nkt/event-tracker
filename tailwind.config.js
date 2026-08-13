@@ -1,0 +1,2 @@
+/** Theme Event Tracker: nền giấy ngà, mực navy, coral. */
+module.exports={darkMode:'class',content:['./app/**/*.{ts,tsx}','./components/**/*.{ts,tsx}'],theme:{extend:{colors:{ink:'#17202a',coral:'#e66f51',paper:'#f7f3ea',sage:'#a9b7a0'},fontFamily:{display:['Georgia','serif']},boxShadow:{soft:'0 18px 50px rgba(23,32,42,.08)'}}},plugins:[]};
