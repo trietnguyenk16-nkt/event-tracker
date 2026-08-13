@@ -1,3 +1,97 @@
 'use client';
-import {useEffect,useMemo,useState} from 'react'; import EventForm from '@/components/EventForm'; import EventList,{EventItem} from '@/components/EventList';
-export default function Home(){const [events,setEvents]=useState<EventItem[]>([]),[editing,setEditing]=useState<EventItem|null>(null),[open,setOpen]=useState(false),[dark,setDark]=useState(false),[q,setQ]=useState({date:'',tag:'',status:'all'}); useEffect(()=>{const c=localStorage.getItem('events-cache');if(c)setEvents(JSON.parse(c));const d=localStorage.getItem('theme')==='dark';setDark(d);document.documentElement.classList.toggle('dark',d);fetch('/api/events').then(r=>r.ok?r.json():[]).then(setEvents).catch(()=>{})},[]);useEffect(()=>{localStorage.setItem('events-cache',JSON.stringify(events))},[events]); const filtered=useMemo(()=>events.filter(e=>(!q.date||e.event_datetime.slice(0,10)===q.date)&&(!q.tag||e.tags.some(t=>t.toLowerCase().includes(q.tag.toLowerCase())))&&(q.status==='all'||(q.status==='done'?e.is_completed:!e.is_completed))),[events,q]); async function save(p:Partial<EventItem>){const r=await fetch(editing?'/api/events/'+editing.id:'/api/events',{method:editing?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});if(!r.ok)throw Error();const item=await r.json();setEvents(x=>editing?x.map(e=>e.id===item.id?item:e):[item,...x]);setOpen(false);setEditing(null)} async function remove(id:string){if(!confirm('Xóa sự kiện này?'))return;await fetch('/api/events/'+id,{method:'DELETE'});setEvents(x=>x.filter(e=>e.id!==id))} async function toggle(e:EventItem){const r=await fetch('/api/events/'+e.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_completed:!e.is_completed})});const u=await r.json();setEvents(x=>x.map(a=>a.id===u.id?u:a))} function theme(){const n=!dark;setDark(n);document.documentElement.classList.toggle('dark',n);localStorage.setItem('theme',n?'dark':'light')} return <main className="min-h-screen bg-paper text-ink dark:bg-[#111820] dark:text-paper"><header className="border-b border-ink/10 dark:border-white/10"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5"><div className="flex items-center gap-3"><img src="/icon.svg" width="34" height="34" alt="Event Tracker"/><div><p className="font-display text-xl font-bold">Event Tracker</p><p className="text-xs uppercase tracking-[.2em] opacity-50">Make time visible</p></div></div><button onClick={theme} className="rounded-full border border-ink/15 px-3 py-2 text-sm dark:border-white/15">{dark?'Sáng':'Tối'}</button></div></header><section className="mx-auto grid max-w-6xl gap-10 px-5 py-10 lg:grid-cols-[1fr_360px]"><div><div className="rise mb-8 max-w-2xl"><p className="mb-3 text-sm font-bold uppercase tracking-[.24em] text-coral">Lịch của bạn, rõ ràng hơn</p><h1 className="font-display text-5xl leading-[.95] md:text-7xl">Đừng để điều quan trọng trôi qua.</h1><p className="mt-5 max-w-xl text-lg opacity-65">Ghi lại mốc cần nhớ, lọc theo nhịp sống và nhận nhắc lịch trước khi bắt đầu.</p></div><div className="mb-5 flex flex-wrap gap-2"><input type="date" value={q.date} onChange={e=>setQ({...q,date:e.target.value})} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"/><input placeholder="Tìm tag" value={q.tag} onChange={e=>setQ({...q,tag:e.target.value})} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"/><select value={q.status} onChange={e=>setQ({...q,status:e.target.value})} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"><option value="all">Tất cả</option><option value="todo">Chưa xong</option><option value="done">Đã xong</option></select></div><EventList events={filtered} onEdit={e=>{setEditing(e);setOpen(true)}} onDelete={remove} onToggle={toggle}/></div><aside><div className="sticky top-6 rounded-3xl bg-ink p-6 text-paper shadow-soft"><p className="text-sm uppercase tracking-[.2em] opacity-50">Tổng quan</p><p className="mt-2 font-display text-5xl">{events.filter(e=>!e.is_completed).length}</p><p className="text-sm opacity-60">việc đang chờ</p><p className="mt-8 text-sm opacity-75">Nhắc lịch: <strong>1 ngày · 2 giờ · 30 phút</strong></p><button onClick={()=>{setEditing(null);setOpen(true)}} className="mt-8 w-full rounded-2xl bg-coral px-4 py-3 font-bold transition hover:-translate-y-0.5">+ Thêm sự kiện</button></div></aside></section>{open&&<EventForm initial={editing} onSave={save} onClose={()=>{setOpen(false);setEditing(null)}}/>}</main>}
+
+import { useEffect, useMemo, useState } from 'react';
+import EventForm from '@/components/EventForm';
+import EventList, { EventItem } from '@/components/EventList';
+
+const mockEvents: EventItem[] = [
+  { id: 'mock-1', title: 'Review kế hoạch quý III', description: 'Chốt các mốc quan trọng với đội ngũ.', event_datetime: '2026-08-20T09:30:00.000Z', tags: ['công việc', 'planning'], is_completed: false, reminder_offset_minutes: 1440, email: 'demo@example.com' },
+  { id: 'mock-2', title: 'Chạy bộ buổi sáng', description: 'Năm kilomet quanh công viên.', event_datetime: '2026-08-22T06:30:00.000Z', tags: ['cá nhân'], is_completed: false, reminder_offset_minutes: 120, email: 'demo@example.com' },
+  { id: 'mock-3', title: 'Gửi bản tổng kết', description: 'Đã hoàn thành trong tuần này.', event_datetime: '2026-08-17T16:00:00.000Z', tags: ['công việc'], is_completed: true, reminder_offset_minutes: null, email: null },
+];
+
+export default function Home() {
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [editing, setEditing] = useState<EventItem | null>(null);
+  const [open, setOpen] = useState(false);
+  const [dark, setDark] = useState(false);
+  const [mockMode, setMockMode] = useState(false);
+  const [q, setQ] = useState({ date: '', tag: '', status: 'all' });
+
+  useEffect(() => {
+    const cached = localStorage.getItem('events-cache');
+    if (cached) setEvents(JSON.parse(cached));
+    const savedTheme = localStorage.getItem('theme') === 'dark';
+    setDark(savedTheme);
+    document.documentElement.classList.toggle('dark', savedTheme);
+    fetch('/api/events')
+      .then((response) => {
+        if (!response.ok) throw new Error('Database chưa được cấu hình');
+        return response.json();
+      })
+      .then((payload) => setEvents(payload.data ?? payload))
+      .catch(() => {
+        setMockMode(true);
+        if (!cached) setEvents(mockEvents);
+      });
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('events-cache', JSON.stringify(events));
+  }, [events]);
+
+  const filtered = useMemo(() => events.filter((event) => (
+    (!q.date || event.event_datetime.slice(0, 10) === q.date)
+    && (!q.tag || event.tags.some((tag) => tag.toLowerCase().includes(q.tag.toLowerCase())))
+    && (q.status === 'all' || (q.status === 'done' ? event.is_completed : !event.is_completed))
+  )), [events, q]);
+
+  async function save(payload: Partial<EventItem>) {
+    try {
+      const response = await fetch(editing ? `/api/events/${editing.id}` : '/api/events', {
+        method: editing ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error('Mock fallback');
+      const item = await response.json();
+      setEvents((current) => editing ? current.map((event) => event.id === item.id ? item : event) : [item, ...current]);
+    } catch {
+      const item: EventItem = { id: editing?.id ?? `mock-${Date.now()}`, title: payload.title ?? 'Sự kiện mới', description: payload.description, event_datetime: payload.event_datetime ?? new Date().toISOString(), tags: payload.tags ?? [], is_completed: payload.is_completed ?? false, reminder_offset_minutes: payload.reminder_offset_minutes, email: payload.email };
+      setMockMode(true);
+      setEvents((current) => editing ? current.map((event) => event.id === item.id ? item : event) : [item, ...current]);
+    }
+    setOpen(false);
+    setEditing(null);
+  }
+
+  async function remove(id: string) {
+    if (!confirm('Xóa sự kiện này?')) return;
+    try { await fetch(`/api/events/${id}`, { method: 'DELETE' }); } catch { /* Mock mode */ }
+    setEvents((current) => current.filter((event) => event.id !== id));
+  }
+
+  async function toggle(event: EventItem) {
+    try {
+      const response = await fetch(`/api/events/${event.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_completed: !event.is_completed }) });
+      if (!response.ok) throw new Error('Mock fallback');
+      const updated = await response.json();
+      setEvents((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch {
+      setMockMode(true);
+      setEvents((current) => current.map((item) => item.id === event.id ? { ...item, is_completed: !item.is_completed } : item));
+    }
+  }
+
+  function theme() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  }
+
+  return <main className="min-h-screen bg-paper text-ink dark:bg-[#111820] dark:text-paper">
+    <header className="border-b border-ink/10 dark:border-white/10"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5"><div className="flex items-center gap-3"><img src="/icon.svg" width="34" height="34" alt="Event Tracker"/><div><p className="font-display text-xl font-bold">Event Tracker</p><p className="text-xs uppercase tracking-[.2em] opacity-50">Make time visible</p></div></div><div className="flex items-center gap-3">{mockMode && <span className="rounded-full bg-coral/15 px-3 py-2 text-xs font-bold text-coral">Mock preview</span>}<button onClick={theme} className="rounded-full border border-ink/15 px-3 py-2 text-sm dark:border-white/15">{dark ? 'Sáng' : 'Tối'}</button></div></div></header>
+    <section className="mx-auto grid max-w-6xl gap-10 px-5 py-10 lg:grid-cols-[1fr_360px]"><div><div className="rise mb-8 max-w-2xl"><p className="mb-3 text-sm font-bold uppercase tracking-[.24em] text-coral">Lịch của bạn, rõ ràng hơn</p><h1 className="font-display text-5xl leading-[.95] md:text-7xl">Đừng để điều quan trọng trôi qua.</h1><p className="mt-5 max-w-xl text-lg opacity-65">Ghi lại mốc cần nhớ, lọc theo nhịp sống và nhận nhắc lịch trước khi bắt đầu.</p></div><div className="mb-5 flex flex-wrap gap-2"><input type="date" value={q.date} onChange={(event) => setQ({ ...q, date: event.target.value })} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"/><input placeholder="Tìm tag" value={q.tag} onChange={(event) => setQ({ ...q, tag: event.target.value })} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"/><select value={q.status} onChange={(event) => setQ({ ...q, status: event.target.value })} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"><option value="all">Tất cả</option><option value="todo">Chưa xong</option><option value="done">Đã xong</option></select></div><EventList events={filtered} onEdit={(event) => { setEditing(event); setOpen(true); }} onDelete={remove} onToggle={toggle}/></div><aside><div className="sticky top-6 rounded-3xl bg-ink p-6 text-paper shadow-soft"><p className="text-sm uppercase tracking-[.2em] opacity-50">Tổng quan</p><p className="mt-2 font-display text-5xl">{events.filter((event) => !event.is_completed).length}</p><p className="text-sm opacity-60">việc đang chờ</p><p className="mt-8 text-sm opacity-75">Nhắc lịch: <strong>1 ngày · 2 giờ · 30 phút</strong></p><button onClick={() => { setEditing(null); setOpen(true); }} className="mt-8 w-full rounded-2xl bg-coral px-4 py-3 font-bold transition hover:-translate-y-0.5">+ Thêm sự kiện</button></div></aside></section>
+    {open && <EventForm initial={editing} onSave={save} onClose={() => { setOpen(false); setEditing(null); }}/>}</main>;
+}

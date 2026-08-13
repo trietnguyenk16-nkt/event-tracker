@@ -15,3 +15,17 @@ Tạo API key, xác minh domain gửi, đặt `RESEND_API_KEY` và `EMAIL_FROM`.
 Import repo, thêm toàn bộ env cho Production/Preview, build `npm run build`. Cấu hình cron gọi `/api/cron/reminders` mỗi 5 phút và bảo vệ bằng `CRON_SECRET`.
 
 Không commit `.env`; không đưa secret vào client. Offline cache lưu danh sách gần nhất trong localStorage và service worker cache app shell.
+
+
+## API filter
+
+`GET /api/events` hỗ trợ lọc phía server và phân trang:
+
+- `date=YYYY-MM-DD` lọc theo ngày UTC.
+- `tag=planning` lọc event có tag tương ứng.
+- `status=all|completed|pending` lọc trạng thái.
+- `page=1&limit=50` phân trang, giới hạn tối đa 100 bản ghi mỗi trang.
+
+Ví dụ: `GET /api/events?date=2026-08-20&tag=planning&status=pending&page=1&limit=20`.
+
+Response trả về `data`, `pagination` gồm `page`, `limit`, `total`, `totalPages` và `filters` đã áp dụng.
