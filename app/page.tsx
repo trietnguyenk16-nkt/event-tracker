@@ -16,6 +16,7 @@ export default function Home() {
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(false);
   const [mockMode, setMockMode] = useState(false);
+  const [offline, setOffline] = useState(false);
   const [q, setQ] = useState({ date: '', tag: '', status: 'all' });
 
   useEffect(() => {
@@ -24,51 +25,39 @@ export default function Home() {
     const savedTheme = localStorage.getItem('theme') === 'dark';
     setDark(savedTheme);
     document.documentElement.classList.toggle('dark', savedTheme);
+    const setConnection = () => setOffline(!navigator.onLine);
+    setConnection();
+    window.addEventListener('online', setConnection);
+    window.addEventListener('offline', setConnection);
     fetch('/api/events')
-      .then((response) => {
-        if (!response.ok) throw new Error('Database chưa được cấu hình');
-        return response.json();
-      })
-      .then((payload) => setEvents(payload.data ?? payload))
-      .catch(() => {
-        setMockMode(true);
-        if (!cached) setEvents(mockEvents);
-      });
+      .then(response => { if (!response.ok) throw new Error('Database chưa được cấu hình'); return response.json(); })
+      .then(payload => { setEvents(payload.data ?? payload); setOffline(false); })
+      .catch(() => { setMockMode(true); setOffline(!navigator.onLine); if (!cached) setEvents(mockEvents); });
+    return () => { window.removeEventListener('online', setConnection); window.removeEventListener('offline', setConnection); };
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('events-cache', JSON.stringify(events));
-  }, [events]);
+  useEffect(() => { localStorage.setItem('events-cache', JSON.stringify(events)); }, [events]);
 
-  const filtered = useMemo(() => events.filter((event) => (
-    (!q.date || event.event_datetime.slice(0, 10) === q.date)
-    && (!q.tag || event.tags.some((tag) => tag.toLowerCase().includes(q.tag.toLowerCase())))
-    && (q.status === 'all' || (q.status === 'done' ? event.is_completed : !event.is_completed))
-  )), [events, q]);
+  const filtered = useMemo(() => events.filter(event => (!q.date || event.event_datetime.slice(0, 10) === q.date) && (!q.tag || event.tags.some(tag => tag.toLowerCase().includes(q.tag.toLowerCase()))) && (q.status === 'all' || (q.status === 'done' ? event.is_completed : !event.is_completed))), [events, q]);
 
   async function save(payload: Partial<EventItem>) {
     try {
-      const response = await fetch(editing ? `/api/events/${editing.id}` : '/api/events', {
-        method: editing ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(editing ? `/api/events/${editing.id}` : '/api/events', { method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!response.ok) throw new Error('Mock fallback');
       const item = await response.json();
-      setEvents((current) => editing ? current.map((event) => event.id === item.id ? item : event) : [item, ...current]);
+      setEvents(current => editing ? current.map(event => event.id === item.id ? item : event) : [item, ...current]);
     } catch {
       const item: EventItem = { id: editing?.id ?? `mock-${Date.now()}`, title: payload.title ?? 'Sự kiện mới', description: payload.description, event_datetime: payload.event_datetime ?? new Date().toISOString(), tags: payload.tags ?? [], is_completed: payload.is_completed ?? false, reminder_offset_minutes: payload.reminder_offset_minutes, email: payload.email };
       setMockMode(true);
-      setEvents((current) => editing ? current.map((event) => event.id === item.id ? item : event) : [item, ...current]);
+      setEvents(current => editing ? current.map(event => event.id === item.id ? item : event) : [item, ...current]);
     }
-    setOpen(false);
-    setEditing(null);
+    setOpen(false); setEditing(null);
   }
 
   async function remove(id: string) {
     if (!confirm('Xóa sự kiện này?')) return;
     try { await fetch(`/api/events/${id}`, { method: 'DELETE' }); } catch { /* Mock mode */ }
-    setEvents((current) => current.filter((event) => event.id !== id));
+    setEvents(current => current.filter(event => event.id !== id));
   }
 
   async function toggle(event: EventItem) {
@@ -76,22 +65,20 @@ export default function Home() {
       const response = await fetch(`/api/events/${event.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_completed: !event.is_completed }) });
       if (!response.ok) throw new Error('Mock fallback');
       const updated = await response.json();
-      setEvents((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setEvents(current => current.map(item => item.id === updated.id ? updated : item));
     } catch {
-      setMockMode(true);
-      setEvents((current) => current.map((item) => item.id === event.id ? { ...item, is_completed: !item.is_completed } : item));
+      setMockMode(true); setEvents(current => current.map(item => item.id === event.id ? { ...item, is_completed: !item.is_completed } : item));
     }
   }
 
-  function theme() {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('theme', next ? 'dark' : 'light');
-  }
+  function theme() { const next = !dark; setDark(next); document.documentElement.classList.toggle('dark', next); localStorage.setItem('theme', next ? 'dark' : 'light'); }
+  function openCreate() { setEditing(null); setOpen(true); }
 
-  return <main className="min-h-screen bg-paper text-ink dark:bg-[#111820] dark:text-paper">
-    <header className="border-b border-ink/10 dark:border-white/10"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5"><div className="flex items-center gap-3"><img src="/icon.svg" width="34" height="34" alt="Event Tracker"/><div><p className="font-display text-xl font-bold">Event Tracker</p><p className="text-xs uppercase tracking-[.2em] opacity-50">Make time visible</p></div></div><div className="flex items-center gap-3">{mockMode && <span className="rounded-full bg-coral/15 px-3 py-2 text-xs font-bold text-coral">Mock preview</span>}<button onClick={theme} className="rounded-full border border-ink/15 px-3 py-2 text-sm dark:border-white/15">{dark ? 'Sáng' : 'Tối'}</button></div></div></header>
-    <section className="mx-auto grid max-w-6xl gap-10 px-5 py-10 lg:grid-cols-[1fr_360px]"><div><div className="rise mb-8 max-w-2xl"><p className="mb-3 text-sm font-bold uppercase tracking-[.24em] text-coral">Lịch của bạn, rõ ràng hơn</p><h1 className="font-display text-5xl leading-[.95] md:text-7xl">Đừng để điều quan trọng trôi qua.</h1><p className="mt-5 max-w-xl text-lg opacity-65">Ghi lại mốc cần nhớ, lọc theo nhịp sống và nhận nhắc lịch trước khi bắt đầu.</p></div><div className="mb-5 flex flex-wrap gap-2"><input type="date" value={q.date} onChange={(event) => setQ({ ...q, date: event.target.value })} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"/><input placeholder="Tìm tag" value={q.tag} onChange={(event) => setQ({ ...q, tag: event.target.value })} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"/><select value={q.status} onChange={(event) => setQ({ ...q, status: event.target.value })} className="rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5"><option value="all">Tất cả</option><option value="todo">Chưa xong</option><option value="done">Đã xong</option></select></div><EventList events={filtered} onEdit={(event) => { setEditing(event); setOpen(true); }} onDelete={remove} onToggle={toggle}/></div><aside><div className="sticky top-6 rounded-3xl bg-ink p-6 text-paper shadow-soft"><p className="text-sm uppercase tracking-[.2em] opacity-50">Tổng quan</p><p className="mt-2 font-display text-5xl">{events.filter((event) => !event.is_completed).length}</p><p className="text-sm opacity-60">việc đang chờ</p><p className="mt-8 text-sm opacity-75">Nhắc lịch: <strong>1 ngày · 2 giờ · 30 phút</strong></p><button onClick={() => { setEditing(null); setOpen(true); }} className="mt-8 w-full rounded-2xl bg-coral px-4 py-3 font-bold transition hover:-translate-y-0.5">+ Thêm sự kiện</button></div></aside></section>
-    {open && <EventForm initial={editing} onSave={save} onClose={() => { setOpen(false); setEditing(null); }}/>}</main>;
+  return <main className="min-h-[100dvh] overflow-x-hidden bg-paper pb-[env(safe-area-inset-bottom)] text-ink dark:bg-[#111820] dark:text-paper">
+    <header className="border-b border-ink/10 pt-[env(safe-area-inset-top)] dark:border-white/10"><div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-5 sm:py-5"><div className="flex min-w-0 items-center gap-3"><img src="/icon.svg" width="40" height="40" alt="Event Tracker" className="shrink-0" /><div className="min-w-0"><p className="truncate font-display text-lg font-bold sm:text-xl">Event Tracker</p><p className="hidden text-xs uppercase tracking-[.2em] opacity-50 xs:block sm:block">Make time visible</p></div></div><div className="flex shrink-0 items-center gap-2">{mockMode && <span className="hidden rounded-full bg-coral/15 px-3 py-2 text-xs font-bold text-coral sm:inline">Mock preview</span>}<button onClick={theme} aria-label="Đổi giao diện sáng tối" className="min-h-11 rounded-full border border-ink/15 px-3 py-2 text-sm dark:border-white/15">{dark ? 'Sáng' : 'Tối'}</button></div></div></header>
+    {offline && <div role="status" className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-center text-xs font-bold text-amber-800 dark:text-amber-200">Đang offline · Hiển thị dữ liệu đã lưu trên thiết bị</div>}
+    <section className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-5 sm:py-10 lg:grid-cols-[1fr_360px] lg:gap-10"><div className="min-w-0"><div className="rise mb-7 max-w-2xl sm:mb-8"><p className="mb-3 text-xs font-bold uppercase tracking-[.24em] text-coral sm:text-sm">Lịch của bạn, rõ ràng hơn</p><h1 className="font-display text-4xl leading-[.98] sm:text-5xl md:text-7xl">Đừng để điều quan trọng trôi qua.</h1><p className="mt-4 max-w-xl text-base opacity-65 sm:mt-5 sm:text-lg">Ghi lại mốc cần nhớ, lọc theo nhịp sống và nhận nhắc lịch trước khi bắt đầu.</p></div><div className="mb-5 grid gap-2 sm:flex sm:flex-wrap"><label className="sr-only" htmlFor="filter-date">Lọc theo ngày</label><input id="filter-date" type="date" value={q.date} onChange={event => setQ({ ...q, date: event.target.value })} className="min-h-11 w-full rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5 sm:w-auto" /><label className="sr-only" htmlFor="filter-tag">Lọc theo tag</label><input id="filter-tag" placeholder="Tìm tag" value={q.tag} onChange={event => setQ({ ...q, tag: event.target.value })} className="min-h-11 w-full rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-coral/25 dark:border-white/15 dark:bg-white/5 sm:w-40" /><label className="sr-only" htmlFor="filter-status">Lọc trạng thái</label><select id="filter-status" value={q.status} onChange={event => setQ({ ...q, status: event.target.value })} className="min-h-11 w-full rounded-xl border border-ink/15 bg-white/60 px-3 py-2 text-sm dark:border-white/15 dark:bg-white/5 sm:w-auto"><option value="all">Tất cả</option><option value="todo">Chưa xong</option><option value="done">Đã xong</option></select></div><EventList events={filtered} onEdit={event => { setEditing(event); setOpen(true); }} onDelete={remove} onToggle={toggle} /></div><aside className="lg:sticky lg:top-6 lg:h-fit"><div className="rounded-3xl bg-ink p-5 text-paper shadow-soft sm:p-6"><p className="text-sm uppercase tracking-[.2em] opacity-50">Tổng quan</p><p className="mt-2 font-display text-5xl">{events.filter(event => !event.is_completed).length}</p><p className="text-sm opacity-60">việc đang chờ</p><p className="mt-6 text-sm opacity-75 sm:mt-8">Nhắc lịch: <strong>1 ngày · 2 giờ · 30 phút</strong></p><button onClick={openCreate} className="mt-6 min-h-12 w-full rounded-2xl bg-coral px-4 py-3 font-bold transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2 sm:mt-8">+ Thêm sự kiện</button></div></aside></section>
+    <button onClick={openCreate} aria-label="Thêm sự kiện mới" className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-10 grid min-h-14 min-w-14 place-items-center rounded-full bg-coral px-5 text-2xl font-bold text-white shadow-xl shadow-coral/30 transition hover:scale-105 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2 lg:hidden">+</button>
+    {open && <EventForm initial={editing} onSave={save} onClose={() => { setOpen(false); setEditing(null); }} />}
+  </main>;
 }
