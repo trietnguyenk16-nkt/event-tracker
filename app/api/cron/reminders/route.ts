@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   const candidates = await db.event.findMany({
     where: {
       is_completed: false,
+      deleted_at: null,
       email: { not: null },
       reminder_offset_minutes: { not: null },
       reminder_sent_at: null,

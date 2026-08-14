@@ -12,3 +12,9 @@
 - [x] #26 PWA/mobile: hoàn thiện iPhone 16 Pro safe-area, install metadata, offline read-only state và mobile verification.
 - [x] #27 Regression: thêm route contract tests, PWA smoke checklist và CI verification command/documentation.
 - [x] #28 Quick Capture: bổ sung preview có thể xác nhận trước khi tạo event, validation ambiguity và fallback form thủ công.
+
+## Duration, history and timezone/recurrence
+
+- [x] #17 Duration: thêm duration unit/value, preview ngày sinh, idempotency và liên kết event gốc.
+- [x] #10 Event History: lưu audit record theo transaction, API history và panel mobile.
+- [x] #13 Timezone/recurrence: lưu IANA timezone, recurrence rule và tạo occurrence an toàn theo UTC.

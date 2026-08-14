@@ -9,19 +9,47 @@ datasource db {
 }
 
 model Event {
-  id                      String   @id @default(cuid())
+  id                      String        @id @default(cuid())
   title                   String
   description             String?
   event_datetime          DateTime
-  tags                    String[] @default([])
-  is_completed            Boolean  @default(false)
+  timezone                String        @default("Asia/Ho_Chi_Minh")
+  tags                    String[]      @default([])
+  is_completed            Boolean       @default(false)
   reminder_offset_minutes Int?
   email                   String?
   reminder_sent_at        DateTime?
-  created_at              DateTime @default(now())
-  updated_at              DateTime @updatedAt
+  duration_value          Int?
+  duration_unit           String?
+  source_event_id         String?
+  source_event            Event?        @relation("GeneratedEvents", fields: [source_event_id], references: [id], onDelete: SetNull)
+  generated_events        Event[]       @relation("GeneratedEvents")
+  recurrence_rule         String?
+  recurrence_end          DateTime?
+  recurrence_count        Int?
+  recurrence_index        Int?
+  deleted_at              DateTime?
+  idempotency_key         String?       @unique
+  created_at              DateTime      @default(now())
+  updated_at              DateTime      @updatedAt
+  history                 EventHistory[]
 
   @@index([event_datetime])
   @@index([is_completed])
   @@index([email])
+  @@index([source_event_id])
+  @@index([recurrence_rule, event_datetime])
+  @@index([deleted_at])
+}
+
+model EventHistory {
+  id         String   @id @default(cuid())
+  event_id   String
+  action     String
+  changes    Json?
+  actor      String?
+  created_at DateTime @default(now())
+  event      Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id, created_at])
 }

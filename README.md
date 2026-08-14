@@ -56,3 +56,13 @@ Trước mỗi production deploy, chạy `pnpm run verify`. Lệnh này chạy t
 Checklist thủ công gồm: tạo/sửa/hoàn tất/xóa event; lọc date/tag/status và phân trang; kiểm tra cron bằng `CRON_SECRET`; xác nhận email Resend ở môi trường test; mở `/manifest.json`; kiểm tra service worker không intercept request mutation hoặc API; tải app một lần rồi chuyển offline để đọc dữ liệu cache; kiểm tra viewport 393x852, bàn phím mobile và vùng safe-area. Cần xác nhận thêm trên iPhone Safari thật vì sandbox không thay thế thiết bị iOS.
 
 Quick Capture AI hiện tạo **bản nháp chưa lưu**. Người dùng phải xem preview, xử lý cảnh báo thiếu ngày/giờ, bấm “Xác nhận và chỉnh sửa”, rồi mới bấm “Lưu sự kiện” trong form. Khi AI lỗi hoặc chưa có key, form thủ công vẫn là fallback.
+
+## Duration, Event History và Timezone/Recurrence
+
+Migration `prisma/migrations/20260814_duration_history_timezone/migration.sql` bổ sung các cột timezone, duration, recurrence, soft-delete, idempotency và bảng `EventHistory`. Với Supabase production, dùng `DIRECT_URL` để chạy migration từ môi trường có Prisma hoặc mở SQL Editor và chạy file migration; không dùng `db push` tùy tiện trên dữ liệu thật. Sau migration, chạy `pnpm exec prisma generate` và redeploy Vercel.
+
+Form event lưu timestamp dưới dạng UTC và lưu timezone IANA riêng, mặc định `Asia/Ho_Chi_Minh`. Duration hỗ trợ ngày, tuần, tháng và năm; khi bật tạo duration, app preview ngày mới và backend tạo event liên kết với event gốc trong transaction. `idempotency_key` ngăn retry tạo bản sao cùng request.
+
+Recurrence hỗ trợ daily, weekly và monthly với số lần hoặc ngày kết thúc, tối đa 60 occurrence. Mỗi occurrence là một event độc lập liên kết về root series; PATCH/DELETE mặc định áp dụng cho một occurrence, còn `scope=series` áp dụng cho cả series. Reminder tiếp tục so sánh instant UTC và loại trừ event đã soft-delete.
+
+Mỗi create/update/complete/reopen/delete ghi vào `EventHistory`; đọc qua `GET /api/events/:id/history`. History được hiển thị từ nút “Xem lịch sử” trong danh sách event và được giữ lại khi event bị xóa mềm.

@@ -1,1 +1,64 @@
-import {NextRequest,NextResponse} from 'next/server'; import {z} from 'zod'; import {db} from '@/lib/db'; const patch=z.object({title:z.string().trim().min(1).max(200).optional(),description:z.string().max(5000).nullable().optional(),event_datetime:z.coerce.date().optional(),tags:z.array(z.string()).max(20).optional(),is_completed:z.boolean().optional(),reminder_offset_minutes:z.number().int().min(0).max(10080).nullable().optional(),email:z.string().email().nullable().or(z.literal('')).optional()}); export async function PATCH(req:NextRequest,{params}:{params:Promise<{id:string}>}){try{const {id}=await params;const data=patch.parse(await req.json());return NextResponse.json(await db.event.update({where:{id},data:{...data,...(data.is_completed===false?{reminder_sent_at:null}:{})}}))}catch{return NextResponse.json({error:'Không thể cập nhật'},{status:400})}} export async function DELETE(_:NextRequest,{params}:{params:Promise<{id:string}>}){const {id}=await params;await db.event.delete({where:{id}});return new NextResponse(null,{status:204})}
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
+import { db } from '@/lib/db';
+import { eventSchema } from '@/lib/eventSchema';
+
+const patchSchema = eventSchema.partial().extend({ is_completed: z.boolean().optional() });
+
+function changedFields(before: Record<string, unknown>, after: Record<string, unknown>) {
+  const changes: Record<string, { before: unknown; after: unknown }> = {};
+  for (const key of Object.keys(after)) {
+    if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) changes[key] = { before: before[key], after: after[key] };
+  }
+  return changes;
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const body = await req.json();
+    const scope = body.scope === 'series' ? 'series' : 'single';
+    const data = patchSchema.parse(body);
+    const { scope: _scope, ...patch } = data as typeof data & { scope?: string };
+    const result = await db.$transaction(async tx => {
+      const current = await tx.event.findUniqueOrThrow({ where: { id }, include: { generated_events: true } });
+      const seriesRoot = current.source_event_id ? await tx.event.findUniqueOrThrow({ where: { id: current.source_event_id }, include: { generated_events: true } }) : current;
+      const targetIds = scope === 'series' ? [seriesRoot.id, ...seriesRoot.generated_events.map(event => event.id)] : [current.id];
+      const action = patch.is_completed === true && !current.is_completed ? 'completed' : patch.is_completed === false && current.is_completed ? 'reopened' : 'updated';
+      const updated = [];
+      for (const targetId of targetIds) {
+        const before = await tx.event.findUniqueOrThrow({ where: { id: targetId } });
+        const item = await tx.event.update({ where: { id: targetId }, data: { ...patch, ...(patch.is_completed === false ? { reminder_sent_at: null } : {}) } });
+        await tx.eventHistory.create({ data: { event_id: targetId, action, changes: changedFields(before as unknown as Record<string, unknown>, item as unknown as Record<string, unknown>) as Prisma.InputJsonValue } });
+        updated.push(item);
+      }
+      return updated.length === 1 ? updated[0] : updated;
+    });
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('[events] update failed', error instanceof Error ? error.message : 'unknown');
+    return NextResponse.json({ error: 'Không thể cập nhật' }, { status: 400 });
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const scope = new URL(req.url).searchParams.get('scope') === 'series' ? 'series' : 'single';
+    const result = await db.$transaction(async tx => {
+      const current = await tx.event.findUniqueOrThrow({ where: { id }, include: { generated_events: true } });
+      const seriesRoot = current.source_event_id ? await tx.event.findUniqueOrThrow({ where: { id: current.source_event_id }, include: { generated_events: true } }) : current;
+      const targetIds = scope === 'series' ? [seriesRoot.id, ...seriesRoot.generated_events.map(event => event.id)] : [current.id];
+      for (const targetId of targetIds) {
+        const before = await tx.event.findUniqueOrThrow({ where: { id: targetId } });
+        await tx.event.update({ where: { id: targetId }, data: { deleted_at: new Date() } });
+        await tx.eventHistory.create({ data: { event_id: targetId, action: 'deleted', changes: { before: { deleted_at: before.deleted_at }, after: { deleted_at: 'now' } } } });
+      }
+      return { deleted: targetIds.length };
+    });
+    return NextResponse.json(result);
+  } catch {
+    return NextResponse.json({ error: 'Không thể xóa' }, { status: 400 });
+  }
+}
