@@ -48,3 +48,11 @@ Các endpoint AI là `/api/ai/models`, `/api/ai/quick-capture`, `/api/ai/agenda`
 ## Lưu ý OpenAI
 
 Hãy tạo API key tại OpenAI Platform và đặt trong **Vercel → Project Settings → Environment Variables** cho Production/Preview. Sau khi thêm hoặc đổi key, cần redeploy. Nên đặt hạn mức chi phí ở OpenAI Platform và theo dõi usage; app đã giới hạn model allowlist, input quick capture 4.000 ký tự, search 1.000 ký tự và timeout provider 15 giây.
+
+## Regression và PWA smoke checklist
+
+Trước mỗi production deploy, chạy `pnpm run verify`. Lệnh này chạy toàn bộ Vitest, TypeScript, production dependency audit và Next.js production build; không gọi Resend thật và không ghi vào production database.
+
+Checklist thủ công gồm: tạo/sửa/hoàn tất/xóa event; lọc date/tag/status và phân trang; kiểm tra cron bằng `CRON_SECRET`; xác nhận email Resend ở môi trường test; mở `/manifest.json`; kiểm tra service worker không intercept request mutation hoặc API; tải app một lần rồi chuyển offline để đọc dữ liệu cache; kiểm tra viewport 393x852, bàn phím mobile và vùng safe-area. Cần xác nhận thêm trên iPhone Safari thật vì sandbox không thay thế thiết bị iOS.
+
+Quick Capture AI hiện tạo **bản nháp chưa lưu**. Người dùng phải xem preview, xử lý cảnh báo thiếu ngày/giờ, bấm “Xác nhận và chỉnh sửa”, rồi mới bấm “Lưu sự kiện” trong form. Khi AI lỗi hoặc chưa có key, form thủ công vẫn là fallback.

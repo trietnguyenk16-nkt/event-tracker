@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import type { EventItem } from './EventList';
 
-export default function EventForm({ initial, onSave, onClose }: { initial: EventItem | null; onSave: (p: Partial<EventItem>) => Promise<void>; onClose: () => void }) {
-  const [f, setF] = useState({ title: initial?.title ?? '', description: initial?.description ?? '', event_datetime: initial?.event_datetime?.slice(0, 16) ?? '', tags: initial?.tags.join(', ') ?? '', reminder_offset_minutes: String(initial?.reminder_offset_minutes ?? 1440), email: initial?.email ?? '' });
+export default function EventForm({ initial, onSave, onClose }: { initial: Partial<EventItem> | null; onSave: (p: Partial<EventItem>) => Promise<void>; onClose: () => void }) {
+  const [f, setF] = useState({ title: initial?.title ?? '', description: initial?.description ?? '', event_datetime: initial?.event_datetime?.slice(0, 16) ?? '', tags: initial?.tags?.join(', ') ?? '', reminder_offset_minutes: String(initial?.reminder_offset_minutes ?? 1440), email: initial?.email ?? '' });
   const [busy, setBusy] = useState(false);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
