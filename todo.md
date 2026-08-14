@@ -18,3 +18,9 @@
 - [x] #17 Duration: thêm duration unit/value, preview ngày sinh, idempotency và liên kết event gốc.
 - [x] #10 Event History: lưu audit record theo transaction, API history và panel mobile.
 - [x] #13 Timezone/recurrence: lưu IANA timezone, recurrence rule và tạo occurrence an toàn theo UTC.
+
+## Rate limit, export/import and production smoke test
+
+- [x] Chuẩn bị checklist chạy migration Supabase và smoke test Vercel/Resend/OpenAI sau deploy.
+- [x] #15 Rate Limit: thêm giới hạn request server-side, response 429 và test reset/window behavior.
+- [x] #14 Export/Import: thêm export JSON/CSV, import có validate/preview và chống duplicate cơ bản.

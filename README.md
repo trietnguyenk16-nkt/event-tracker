@@ -66,3 +66,13 @@ Form event lưu timestamp dưới dạng UTC và lưu timezone IANA riêng, mặ
 Recurrence hỗ trợ daily, weekly và monthly với số lần hoặc ngày kết thúc, tối đa 60 occurrence. Mỗi occurrence là một event độc lập liên kết về root series; PATCH/DELETE mặc định áp dụng cho một occurrence, còn `scope=series` áp dụng cho cả series. Reminder tiếp tục so sánh instant UTC và loại trừ event đã soft-delete.
 
 Mỗi create/update/complete/reopen/delete ghi vào `EventHistory`; đọc qua `GET /api/events/:id/history`. History được hiển thị từ nút “Xem lịch sử” trong danh sách event và được giữ lại khi event bị xóa mềm.
+
+## Quy trình migration và smoke test production
+
+Sau khi pull commit mới, chạy file `prisma/migrations/20260814_duration_history_timezone/migration.sql` trong Supabase SQL Editor hoặc chạy `DIRECT_URL=... pnpm exec prisma migrate deploy` từ môi trường có Prisma. Kiểm tra các cột `timezone`, `duration_value`, `recurrence_rule`, `deleted_at`, `idempotency_key` và bảng `EventHistory` xuất hiện trước khi redeploy Vercel. Không chạy destructive SQL trên database production.
+
+Trong Vercel, xác nhận `DATABASE_URL`, `DIRECT_URL`, `CRON_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`, `OPENAI_API_KEY` và `OPENAI_MODEL` thuộc đúng Production Environment, sau đó bấm **Redeploy**. Smoke test lần lượt `GET /api/health`, tạo event có idempotency key, thử duration/recurrence, mở history, export JSON/CSV, import file hợp lệ và file có lỗi. Gọi cron với `Authorization: Bearer <CRON_SECRET>` trong môi trường test; không commit secret vào repository.
+
+Rate limit hiện là best-effort in-memory theo IP trong từng serverless instance: mutation event 30 request/phút, import 10 request/phút và export 20 request/phút; khi vượt ngưỡng API trả `429`, `Retry-After` và `X-Request-ID`. Nếu traffic production chạy nhiều instance và cần giới hạn toàn cục, thay storage in-memory bằng Redis/Upstash trước khi mở public access rộng.
+
+Export không chứa API key, cron secret, history nội bộ hoặc metadata hệ thống. Import hỗ trợ JSON/CSV, preview trước khi ghi, báo lỗi theo dòng và skip duplicate dựa trên idempotency key hoặc title + instant UTC + timezone.

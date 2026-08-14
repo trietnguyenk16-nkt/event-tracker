@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sendEventReminder } from '@/lib/email';
 import { isReminderDue, isWithinReminderHorizon } from '@/lib/reminders';
+import { requestId } from '@/lib/rateLimit';
 
 /** Cron được Vercel gọi định kỳ; secret chỉ nằm ở request header/server env. */
 export async function GET(req: NextRequest) {
+  const correlationId = requestId(req);
   if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -37,9 +39,9 @@ export async function GET(req: NextRequest) {
       sent += 1;
     } catch (error) {
       failed += 1;
-      console.error('Reminder failed', event.id, error instanceof Error ? error.message : 'unknown error');
+      console.error('[reminder]', JSON.stringify({ request_id: correlationId, event_id: event.id, error: error instanceof Error ? error.message : 'unknown error' }));
     }
   }
 
-  return NextResponse.json({ checked: candidates.length, sent, failed });
+  return NextResponse.json({ checked: candidates.length, sent, failed, request_id: correlationId }, { headers: { 'X-Request-ID': correlationId, 'Cache-Control': 'no-store' } });
 }

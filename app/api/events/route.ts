@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eventSchema } from '@/lib/eventSchema';
 import { db } from '@/lib/db';
 import { addDuration, buildRecurrenceDates } from '@/lib/dateRules';
+import { checkRateLimit, rateLimitHeaders } from '@/lib/rateLimit';
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const recurrenceRules = ['daily', 'weekly', 'monthly'] as const;
@@ -36,6 +37,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rate = checkRateLimit(request, 'events-write', 30);
+  if (!rate.allowed) return NextResponse.json({ error: 'Quá nhiều yêu cầu, hãy thử lại sau.' }, { status: 429, headers: rateLimitHeaders(rate) });
   try {
     const body = await request.json();
     const parsed = eventSchema.parse(body);
@@ -71,9 +74,9 @@ export async function POST(request: NextRequest) {
       }
       return tx.event.findUniqueOrThrow({ where: { id: root.id }, include: { generated_events: true } });
     });
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(result, { status: 201, headers: rateLimitHeaders(rate) });
   } catch (error) {
     console.error('[events] create failed', error instanceof Error ? error.message : 'unknown');
-    return NextResponse.json({ error: 'Dữ liệu không hợp lệ hoặc không thể tạo sự kiện' }, { status: 400 });
+    return NextResponse.json({ error: 'Dữ liệu không hợp lệ hoặc không thể tạo sự kiện', request_id: rate.requestId }, { status: 400, headers: rateLimitHeaders(rate) });
   }
 }

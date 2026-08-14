@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
+import { checkRateLimit, rateLimitHeaders } from '@/lib/rateLimit';
 import { db } from '@/lib/db';
 import { eventSchema } from '@/lib/eventSchema';
 
@@ -15,6 +16,8 @@ function changedFields(before: Record<string, unknown>, after: Record<string, un
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const rate = checkRateLimit(req, 'events-write', 30);
+  if (!rate.allowed) return NextResponse.json({ error: 'Quá nhiều yêu cầu, hãy thử lại sau.' }, { status: 429, headers: rateLimitHeaders(rate) });
   try {
     const { id } = await params;
     const body = await req.json();
@@ -35,14 +38,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       return updated.length === 1 ? updated[0] : updated;
     });
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: rateLimitHeaders(rate) });
   } catch (error) {
     console.error('[events] update failed', error instanceof Error ? error.message : 'unknown');
-    return NextResponse.json({ error: 'Không thể cập nhật' }, { status: 400 });
+    return NextResponse.json({ error: 'Không thể cập nhật', request_id: rate.requestId }, { status: 400, headers: rateLimitHeaders(rate) });
   }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const rate = checkRateLimit(req, 'events-write', 30);
+  if (!rate.allowed) return NextResponse.json({ error: 'Quá nhiều yêu cầu, hãy thử lại sau.' }, { status: 429, headers: rateLimitHeaders(rate) });
   try {
     const { id } = await params;
     const scope = new URL(req.url).searchParams.get('scope') === 'series' ? 'series' : 'single';
@@ -57,8 +62,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       }
       return { deleted: targetIds.length };
     });
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: rateLimitHeaders(rate) });
   } catch {
-    return NextResponse.json({ error: 'Không thể xóa' }, { status: 400 });
+    return NextResponse.json({ error: 'Không thể xóa', request_id: rate.requestId }, { status: 400, headers: rateLimitHeaders(rate) });
   }
 }
