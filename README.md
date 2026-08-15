@@ -76,3 +76,15 @@ Trong Vercel, xác nhận `DATABASE_URL`, `DIRECT_URL`, `CRON_SECRET`, `RESEND_A
 Rate limit hiện là best-effort in-memory theo IP trong từng serverless instance: mutation event 30 request/phút, import 10 request/phút và export 20 request/phút; khi vượt ngưỡng API trả `429`, `Retry-After` và `X-Request-ID`. Nếu traffic production chạy nhiều instance và cần giới hạn toàn cục, thay storage in-memory bằng Redis/Upstash trước khi mở public access rộng.
 
 Export không chứa API key, cron secret, history nội bộ hoặc metadata hệ thống. Import hỗ trợ JSON/CSV, preview trước khi ghi, báo lỗi theo dòng và skip duplicate dựa trên idempotency key hoặc title + instant UTC + timezone.
+
+## Checklist triển khai Vercel và Supabase
+
+| Giai đoạn | Việc cần làm | Kết quả cần kiểm tra |
+|---|---|---|
+| Supabase | Tạo project Postgres, lấy pooled `DATABASE_URL` và direct `DIRECT_URL` | Không commit password hoặc service key |
+| Migration | Chạy `prisma/migrations/20260814_duration_history_timezone/migration.sql` trong SQL Editor hoặc `DIRECT_URL=... pnpm exec prisma migrate deploy` | Có bảng `Event`, `EventHistory`, index thời gian/trạng thái và các cột recurrence |
+| Vercel | Import repository `trietnguyenk16-nkt/event-tracker`, chọn Next.js và thêm env Production | Build không chứa secret phía client |
+| Resend/Cron | Thêm `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`; kiểm tra Vercel Cron | `GET /api/health` trả `status: ok`, cron sai secret trả 401 |
+| Rollback | Trước migration lớn, export JSON/CSV và lưu checkpoint/deployment ổn định | Có bản backup và version có thể quay lại |
+
+Nếu migration thất bại, không chạy lại bằng `db push` trên Production. Kiểm tra lỗi SQL, khôi phục deployment code trước đó nếu cần, rồi xác nhận schema bằng Prisma/Supabase trước khi tiếp tục. Với thay đổi schema phá vỡ tương thích, dùng quy trình expand–migrate–contract thay vì xóa cột trực tiếp.

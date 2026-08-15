@@ -30,3 +30,9 @@
 - [x] Rà soát issue còn mở và chọn 2–3 hạng mục có giá trị cao nhất sau #14/#15: #7 Quality, #11 Email Reminder Testing và #9 UX.
 - [x] Implement #7 Quality, #11 Email Reminder Testing và #9 UX, gồm backend, UI và tests tương ứng. Email thật vẫn cần manual smoke test sau khi có Resend credentials.
 - [x] Chạy verify, cập nhật GitHub, commit/push và lưu checkpoint cho nhóm issue mới.
+
+## Continued high-value backlog
+
+- [x] Rà soát issue còn mở sau nhóm #7/#9/#14/#15 và chọn 2–3 feature tiếp theo: #18 Calendar Views, #8 Deployment và #25 Supabase workflow.
+- [x] Implement #18 Calendar Views, #8 Deployment và #25 Supabase workflow cùng tests và UI/API tương ứng. Database production thật vẫn cần smoke test bằng credentials của người dùng.
+- [x] Chạy verify, cập nhật GitHub, push code và lưu checkpoint mới cho nhóm #18/#8/#25.
