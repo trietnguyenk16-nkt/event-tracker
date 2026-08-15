@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { EventItem } from './EventList';
+import { formatAIResponse } from '@/lib/aiText';
 
 type AiDraft = Partial<EventItem> & {
   timezone?: string;
@@ -41,10 +42,10 @@ export default function AIAssistant({ onDraft }: Props) {
     try {
       const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const payload = await response.json();
-      setResult(JSON.stringify(payload, null, 2));
+      setResult(formatAIResponse(active, payload));
       if (active === 'capture' && payload.draft && typeof payload.draft === 'object') setDraft(payload.draft as AiDraft);
     } catch {
-      setResult(JSON.stringify({ error: 'Không thể kết nối AI service' }, null, 2));
+      setResult('AI chưa thể kết nối với dịch vụ.\nVui lòng kiểm tra cấu hình OpenAI hoặc thử lại sau.');
     } finally {
       setBusy(false);
     }
@@ -63,6 +64,6 @@ export default function AIAssistant({ onDraft }: Props) {
     {active === 'search' && <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Ví dụ: Tuần sau tôi có việc gì liên quan khách hàng?" className="mt-4 min-h-12 w-full rounded-2xl border border-ink/15 bg-white/70 px-3 text-base outline-none focus:ring-2 focus:ring-coral/25 dark:border-white/15 dark:bg-white/5" />}
     {draft && <div className="mt-4 rounded-2xl border border-sage/40 bg-sage/10 p-4" role="status"><p className="text-xs font-bold uppercase tracking-wide text-sage">Bản nháp AI · chưa lưu</p><p className="mt-1 font-bold">{draft.title}</p><p className="mt-1 text-sm opacity-70">{draft.event_datetime ? new Date(draft.event_datetime).toLocaleString('vi-VN') : 'Chưa có thời gian'}</p>{draft.needs_clarification && <p className="mt-2 text-sm font-bold text-coral">Cần làm rõ: {draft.clarification ?? 'Thiếu thông tin ngày hoặc giờ.'}</p>}<div className="mt-3 flex flex-wrap gap-2"><button disabled={Boolean(draft.needs_clarification)} onClick={confirmDraft} className="min-h-10 rounded-xl bg-coral px-3 text-sm font-bold text-white disabled:opacity-50">Xác nhận và chỉnh sửa</button><button onClick={() => setDraft(null)} className="min-h-10 rounded-xl border border-ink/15 px-3 text-sm font-bold dark:border-white/15">Bỏ bản nháp</button></div></div>}
     <div className="mt-3 flex items-center justify-between gap-3"><p className="text-xs opacity-60">{configured ? 'OpenAI đã cấu hình trên server.' : 'Chưa có OPENAI_API_KEY · đang dùng fallback an toàn.'}</p><button onClick={run} disabled={busy || (active === 'capture' && !capture.trim()) || (active === 'search' && !query.trim())} className="min-h-11 rounded-xl bg-coral px-4 py-2 text-sm font-bold text-white disabled:opacity-50">{busy ? 'Đang phân tích…' : 'Chạy AI'}</button></div>
-    {result && <pre className="mt-4 max-h-80 overflow-auto rounded-2xl bg-ink p-4 text-xs leading-relaxed text-paper">{result}</pre>}
+    {result && <div className="mt-4 max-h-80 overflow-auto rounded-2xl bg-ink p-4 text-sm leading-7 text-paper whitespace-pre-wrap" role="status">{result}</div>}
   </section>;
 }
