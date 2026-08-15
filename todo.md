@@ -24,3 +24,9 @@
 - [x] Chuẩn bị checklist chạy migration Supabase và smoke test Vercel/Resend/OpenAI sau deploy.
 - [x] #15 Rate Limit: thêm giới hạn request server-side, response 429 và test reset/window behavior.
 - [x] #14 Export/Import: thêm export JSON/CSV, import có validate/preview và chống duplicate cơ bản.
+
+## Next high-priority backlog
+
+- [x] Rà soát issue còn mở và chọn 2–3 hạng mục có giá trị cao nhất sau #14/#15: #7 Quality, #11 Email Reminder Testing và #9 UX.
+- [x] Implement #7 Quality, #11 Email Reminder Testing và #9 UX, gồm backend, UI và tests tương ứng. Email thật vẫn cần manual smoke test sau khi có Resend credentials.
+- [x] Chạy verify, cập nhật GitHub, commit/push và lưu checkpoint cho nhóm issue mới.

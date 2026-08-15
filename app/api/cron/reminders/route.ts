@@ -3,11 +3,12 @@ import { db } from '@/lib/db';
 import { sendEventReminder } from '@/lib/email';
 import { isReminderDue, isWithinReminderHorizon } from '@/lib/reminders';
 import { requestId } from '@/lib/rateLimit';
+import { isCronAuthorized } from '@/lib/cronAuth';
 
 /** Cron được Vercel gọi định kỳ; secret chỉ nằm ở request header/server env. */
 export async function GET(req: NextRequest) {
   const correlationId = requestId(req);
-  if (req.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req.headers.get('authorization'), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
